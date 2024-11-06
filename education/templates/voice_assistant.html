@@ -1,0 +1,255 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Assistant</title>
+    <link href="{% static 'css/styles.css' %}" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+
+    <style>
+        @keyframes underlineCycle {
+            0% { text-decoration-color: red; }
+            25% { text-decoration-color: orange; }
+            50% { text-decoration-color: yellow; }
+            75% { text-decoration-color: green; }
+            100% { text-decoration-color: blue; }
+        }
+
+        .underline-cycling {
+            position: relative;
+            display: inline-block;
+            text-decoration: none;
+        }
+
+        .underline-cycling::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            bottom: -8px; 
+            height: 10px; 
+            width: 100%;
+            background: linear-gradient(90deg, red, orange, yellow, green, blue, red);
+            background-size: 200% 100%;
+            background-position: 100% 0;
+            animation: underlineCycle 3s linear infinite;
+        }
+
+        html, body {
+            height: 100%;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .content {
+            flex: 1;
+        }
+
+        .voice-assistant {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 80vh;
+            padding: 2rem;
+            background-color: #f1f5f9;
+        }
+
+        .assistant-output {
+            width: 100%;
+            max-width: 600px;
+            padding: 1rem;
+            background-color: #ffffff;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            font-size: 1.25rem;
+            color: #333;
+            text-align: center;
+        }
+
+        .input-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .input-wrapper input {
+            width: 70%;
+            padding: 0.75rem;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            font-size: 1rem;
+            outline: none;
+        }
+
+        .input-wrapper button {
+            background-color: #3490dc;
+            color: white;
+            padding: 0.75rem;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .input-wrapper button:hover {
+            background-color: #2779bd;
+        }
+
+        .input-wrapper button:focus {
+            outline: none;
+        }
+
+        /* Camera Modal Styles */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            visibility: hidden;
+            opacity: 0;
+            transition: visibility 0s, opacity 0.3s ease;
+        }
+
+        .modal.active {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 600px;
+            text-align: center;
+        }
+
+        .modal-content video {
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+        }
+
+        .modal-content button {
+            margin-top: 20px;
+            background-color: #3490dc;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .modal-content button:hover {
+            background-color: #2779bd;
+        }
+    </style>
+</head>
+<body class="bg-blue-300 flex flex-col min-h-screen">
+
+    <!-- Navbar -->
+    <nav class="bg-blue-200 p-4 border-b-4 border-blue-300">
+        <div class="container mx-auto flex justify-between items-center px-4">
+            <a href="{% url 'home' %}" class="text-blue-500 text-lg font-semibold hover:text-gray-700 underline-cycling">LearningSmart</a>
+            <div class="space-x-4">
+                {% if user.is_authenticated %}
+                    <a href="{% url 'logout' %}" class="text-blue-500 text-lg font-semibold hover:text-gray-700">Logout</a>
+                {% else %}
+                    <a href="{% url 'login' %}" class="text-blue-500 text-lg font-semibold hover:text-gray-700">Login</a>
+                    <a href="{% url 'signup' %}" class="text-blue-500 text-lg font-semibold hover:text-gray-700">Sign Up</a>
+                {% endif %}
+                <a href="{% url 'voice_assistant' %}" class="text-blue-500 text-lg font-semibold hover:text-gray-700">Assignment</a>
+                <a href="#" class="text-blue-500 text-lg font-semibold hover:text-gray-700">Grade-My-Work</a>
+
+                <!-- Camera Button styled like the rest of the navbar links -->
+                <a href="#" id="openCameraModal" class="text-blue-500 text-lg font-semibold hover:text-gray-700">Open Camera</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Camera Modal -->
+    <div id="cameraModal" class="modal">
+        <div class="modal-content">
+            <h2>Capture Your Question Paper</h2>
+            <video id="video" autoplay></video>
+            <button id="captureButton">Capture Image</button>
+            <button id="closeModal">Close</button>
+        </div>
+    </div>
+
+    <div class="content flex flex-col flex-grow">
+        <!-- Voice Assistant Content -->
+        <div class="voice-assistant">
+            <div class="assistant-output" id="assistantOutput">
+                <p>How can I assist you today?</p>
+            </div>
+
+            <div class="input-wrapper">
+                <input type="text" id="userInputText" placeholder="Ask your question..." class="p-2 border rounded-md w-3/4" />
+                <button id="micButton">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" class="w-6 h-6" viewBox="0 0 24 24" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 1v14m5 2h-10a5 5 0 0 0 10 0z"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Open camera modal
+        document.getElementById("openCameraModal").addEventListener("click", function() {
+            document.getElementById("cameraModal").classList.add("active");
+
+            // Access the device camera
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                navigator.mediaDevices.getUserMedia({ video: true })
+                    .then(function(stream) {
+                        document.getElementById("video").srcObject = stream;
+                    })
+                    .catch(function(err) {
+                        alert("Camera access denied or error occurred: " + err);
+                    });
+            } else {
+                alert("Camera not supported in this browser.");
+            }
+        });
+
+        // Capture Image
+        document.getElementById("captureButton").addEventListener("click", function() {
+            const video = document.getElementById("video");
+            const canvas = document.createElement("canvas");
+            const context = canvas.getContext("2d");
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Convert canvas to image (optional: you can send this image to your server)
+            const image = canvas.toDataURL("image/jpeg");
+
+            // Log or handle the image as needed
+            console.log("Captured image:", image);
+
+            // Close modal after capture
+            document.getElementById("cameraModal").classList.remove("active");
+        });
+
+        // Close modal
+        document.getElementById("closeModal").addEventListener("click", function() {
+            document.getElementById("cameraModal").classList.remove("active");
+        });
+    </script>
+
+</body>
+</html>
